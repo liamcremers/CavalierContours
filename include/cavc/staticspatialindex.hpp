@@ -3,6 +3,7 @@
 #include "internal/common.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <vector>

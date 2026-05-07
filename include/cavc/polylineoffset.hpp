@@ -553,6 +553,8 @@ void lineToArcJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> 
     auto const &sp = v2.pos();
     auto const &ep = u1.pos();
     Real bulge = bulgeForConnection(arcCenter, sp, ep, connectionArcsAreCCW);
+    // bulge > 1 means arc sweep > 180°; clamp to avoid degenerate geometry
+    bulge = std::max(Real(-1), std::min(Real(1), bulge));
     addOrReplaceIfSamePos(result, PlineVertex<Real>(sp, bulge));
     addOrReplaceIfSamePos(result, u1);
   };
@@ -625,6 +627,8 @@ void arcToLineJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> 
     auto const &sp = v2.pos();
     auto const &ep = u1.pos();
     Real bulge = bulgeForConnection(arcCenter, sp, ep, connectionArcsAreCCW);
+    // bulge > 1 means arc sweep > 180°; clamp to avoid degenerate geometry
+    bulge = std::max(Real(-1), std::min(Real(1), bulge));
     addOrReplaceIfSamePos(result, PlineVertex<Real>(sp, bulge));
     addOrReplaceIfSamePos(result, u1);
   };
@@ -699,6 +703,8 @@ void arcToArcJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> c
     auto const &sp = v2.pos();
     auto const &ep = u1.pos();
     Real bulge = bulgeForConnection(arcCenter, sp, ep, connectionArcsAreCCW);
+    // bulge > 1 means arc sweep > 180°; clamp to avoid degenerate geometry
+    bulge = std::max(Real(-1), std::min(Real(1), bulge));
     addOrReplaceIfSamePos(result, PlineVertex<Real>(sp, bulge));
     addOrReplaceIfSamePos(result, u1);
   };
@@ -2305,12 +2311,10 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
       return endpointTouchResult;
     }
 
-    if (options.joinType != OffsetJoinType::Round) {
-      auto relaxedRecoveredResult =
-          recoverClosedOffsetLoopsFromRelaxedSlices(cleaned, rawOffset, offset);
-      if (!relaxedRecoveredResult.empty()) {
-        return relaxedRecoveredResult;
-      }
+    auto relaxedRecoveredResult =
+        recoverClosedOffsetLoopsFromRelaxedSlices(cleaned, rawOffset, offset);
+    if (!relaxedRecoveredResult.empty()) {
+      return relaxedRecoveredResult;
     }
 
     return std::vector<Polyline<Real>>();

@@ -14,23 +14,14 @@ jobs:
         - name: Checkout
           uses: actions/checkout@v4
 
-        - name: Install brew and dependencies
+        - name: Install dependencies
           run: |
-                sh -c "$(curl -fsSL https://raw.githubusercontent.com/Linuxbrew/install/master/install.sh)"
-                test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
-                test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
-                test -r ~/.profile
-                echo "eval \$($(brew --prefix)/bin/brew shellenv)" >>~/.profile
-                echo "export PATH=\"$(brew --prefix)/bin:$PATH\"" >>~/.profile
-                source ~/.profile
-                brew install googletest
-                brew install google-benchmark
-                brew install ninja
+                sudo apt-get update -y
+                sudo apt-get install -y ninja-build libgtest-dev libbenchmark-dev
 
         - name: Ninja gcc build Release
           working-directory: ${{github.workspace}}
           run: |
-                source ~/.profile
                 cmake --no-warn-unused-cli \
                 -DCMAKE_BUILD_TYPE:STRING=Release \
                 -DCMAKE_CXX_STANDARD=20 \

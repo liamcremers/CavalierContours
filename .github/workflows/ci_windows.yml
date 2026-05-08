@@ -11,14 +11,14 @@ jobs:
 
         steps:
         - name: Checkout repository
-          uses: actions/checkout@v2
+          uses: actions/checkout@v4
 
         - name: Configure Compiler
           uses: ilammy/msvc-dev-cmd@v1
 
         - name: Cache Vcpkg Packages
           id: vcpkg-cache
-          uses: actions/cache@v3
+          uses: actions/cache@v4
           with:
                 path: vcpkg_ci_env
                 key: vcpkg-cache-windowsci
@@ -30,7 +30,7 @@ jobs:
           shell: powershell
           run: |
                 echo "VCPKG_ROOT=" >> $GITHUB_ENV
-                git clone https://github.com/Microsoft/vcpkg.git vcpkg_ci_env
+                git clone --depth 1 --branch 2024.11.16 https://github.com/microsoft/vcpkg.git vcpkg_ci_env
                 cd vcpkg_ci_env
                 .\bootstrap-vcpkg.bat
                 .\vcpkg integrate install

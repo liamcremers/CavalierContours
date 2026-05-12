@@ -328,6 +328,56 @@ CAVC_API void cavc_set_tolerances(cavc_tolerances const *tolerances);
 // Reset geometry tolerances to default values.
 CAVC_API void cavc_reset_tolerances(void);
 
+// Functions for working with cavc_compound_pline
+// A compound polyline represents a filled 2-D region with outer loops (CCW) and hole loops (CW).
+// A point is "inside" the compound path when the sum of winding numbers across all loops is
+// non-zero (the standard nonzero fill rule).
+
+typedef struct cavc_compound_pline cavc_compound_pline;
+
+// Create a new, empty compound polyline. Must be freed with cavc_compound_pline_delete.
+CAVC_API cavc_compound_pline *cavc_compound_pline_new(void);
+
+// Delete/free a compound polyline.
+CAVC_API void cavc_compound_pline_delete(cavc_compound_pline *cpline);
+
+// Add an outer (CCW) loop to the compound polyline. A copy of pline is stored.
+CAVC_API void cavc_compound_pline_add_outer(cavc_compound_pline *cpline, cavc_pline const *pline);
+
+// Add a hole (CW) loop to the compound polyline. A copy of pline is stored.
+CAVC_API void cavc_compound_pline_add_hole(cavc_compound_pline *cpline, cavc_pline const *pline);
+
+// Return the number of outer loops.
+CAVC_API uint32_t cavc_compound_pline_outer_count(cavc_compound_pline const *cpline);
+
+// Return the number of hole loops.
+CAVC_API uint32_t cavc_compound_pline_hole_count(cavc_compound_pline const *cpline);
+
+// Get an outer loop by index. The returned pointer is owned by the compound polyline.
+// No bounds checking is performed (ensure index < cavc_compound_pline_outer_count).
+CAVC_API cavc_pline const *cavc_compound_pline_get_outer(cavc_compound_pline const *cpline,
+                                                         uint32_t index);
+
+// Get a hole loop by index. The returned pointer is owned by the compound polyline.
+// No bounds checking is performed (ensure index < cavc_compound_pline_hole_count).
+CAVC_API cavc_pline const *cavc_compound_pline_get_hole(cavc_compound_pline const *cpline,
+                                                        uint32_t index);
+
+// Normalize winding in-place: outer loops are made CCW (positive area), hole loops are made CW
+// (negative area). Call this before combining if winding may be incorrect.
+CAVC_API void cavc_compound_pline_normalize(cavc_compound_pline *cpline);
+
+// Combine two compound polylines using the given boolean mode.
+// combine_mode: 0=Union, 1=Exclude (a-b), 2=Intersect, 3=XOR.
+// If combine_mode is any other value, *result_out is set to NULL.
+// The caller owns the returned cavc_compound_pline and must free it with
+// cavc_compound_pline_delete.
+// All input loops must be closed and have at least 2 vertices; outer loops should be CCW and hole
+// loops CW (call cavc_compound_pline_normalize if unsure).
+CAVC_API void cavc_combine_compound_plines(cavc_compound_pline const *a,
+                                           cavc_compound_pline const *b, int combine_mode,
+                                           cavc_compound_pline **result_out);
+
 #ifdef __cplusplus
 }
 #endif

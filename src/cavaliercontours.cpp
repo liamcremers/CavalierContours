@@ -1,4 +1,5 @@
 #include "cavaliercontours.h"
+#include "cavc/compoundpolylinecombine.hpp"
 #include "cavc/polylinecombine.hpp"
 #include "cavc/polylineoffset.hpp"
 #include "cavc/polylineoffsetislands.hpp"
@@ -37,6 +38,24 @@ struct cavc_spatial_index {
 
 struct cavc_offset_loop_topology {
   std::vector<cavc_offset_loop_topology_node> nodes;
+};
+
+struct cavc_compound_pline {
+  std::vector<std::unique_ptr<cavc_pline>> outerLoops;
+  std::vector<std::unique_ptr<cavc_pline>> holeLoops;
+
+  cavc::CompoundPolyline<cavc_real> toCpp() const {
+    cavc::CompoundPolyline<cavc_real> result;
+    result.outerLoops.reserve(outerLoops.size());
+    result.holeLoops.reserve(holeLoops.size());
+    for (auto const &l : outerLoops) {
+      result.outerLoops.push_back(l->data);
+    }
+    for (auto const &l : holeLoops) {
+      result.holeLoops.push_back(l->data);
+    }
+    return result;
+  }
 };
 
 static cavc_tolerances to_api_tolerances(cavc::utils::EpsilonConfig<cavc_real> const &config) {
@@ -625,5 +644,124 @@ void cavc_set_tolerances(cavc_tolerances const *tolerances) {
 void cavc_reset_tolerances(void) {
   CAVC_BEGIN_TRY_CATCH
   cavc::utils::resetEpsilonConfig<cavc_real>();
+  CAVC_END_TRY_CATCH
+}
+
+// cavc_compound_pline APIs
+// -------------------------
+
+cavc_compound_pline *cavc_compound_pline_new(void) {
+  CAVC_BEGIN_TRY_CATCH
+  return new cavc_compound_pline{};
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_compound_pline_delete(cavc_compound_pline *cpline) {
+  CAVC_BEGIN_TRY_CATCH
+  delete cpline;
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_compound_pline_add_outer(cavc_compound_pline *cpline, cavc_pline const *pline) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  cpline->outerLoops.push_back(std::make_unique<cavc_pline>(cavc::Polyline<cavc_real>(pline->data)));
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_compound_pline_add_hole(cavc_compound_pline *cpline, cavc_pline const *pline) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  cpline->holeLoops.push_back(std::make_unique<cavc_pline>(cavc::Polyline<cavc_real>(pline->data)));
+  CAVC_END_TRY_CATCH
+}
+
+uint32_t cavc_compound_pline_outer_count(cavc_compound_pline const *cpline) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  return static_cast<uint32_t>(cpline->outerLoops.size());
+  CAVC_END_TRY_CATCH
+}
+
+uint32_t cavc_compound_pline_hole_count(cavc_compound_pline const *cpline) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  return static_cast<uint32_t>(cpline->holeLoops.size());
+  CAVC_END_TRY_CATCH
+}
+
+cavc_pline const *cavc_compound_pline_get_outer(cavc_compound_pline const *cpline,
+                                                uint32_t index) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_ASSERT(index < cpline->outerLoops.size(), "index out of range");
+  CAVC_BEGIN_TRY_CATCH
+  return cpline->outerLoops[index].get();
+  CAVC_END_TRY_CATCH
+}
+
+cavc_pline const *cavc_compound_pline_get_hole(cavc_compound_pline const *cpline,
+                                               uint32_t index) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_ASSERT(index < cpline->holeLoops.size(), "index out of range");
+  CAVC_BEGIN_TRY_CATCH
+  return cpline->holeLoops[index].get();
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_compound_pline_normalize(cavc_compound_pline *cpline) {
+  CAVC_ASSERT(cpline, "null cpline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  for (auto &l : cpline->outerLoops) {
+    if (l->data.isClosed() && cavc::getArea(l->data) < cavc_real(0)) {
+      cavc::invertDirection(l->data);
+    }
+  }
+  for (auto &l : cpline->holeLoops) {
+    if (l->data.isClosed() && cavc::getArea(l->data) > cavc_real(0)) {
+      cavc::invertDirection(l->data);
+    }
+  }
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_combine_compound_plines(cavc_compound_pline const *a, cavc_compound_pline const *b,
+                                  int combine_mode, cavc_compound_pline **result_out) {
+  CAVC_ASSERT(a, "null a not allowed");
+  CAVC_ASSERT(b, "null b not allowed");
+  CAVC_ASSERT(result_out, "null result_out not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  cavc::PlineCombineMode mode;
+  switch (combine_mode) {
+  case 0:
+    mode = cavc::PlineCombineMode::Union;
+    break;
+  case 1:
+    mode = cavc::PlineCombineMode::Exclude;
+    break;
+  case 2:
+    mode = cavc::PlineCombineMode::Intersect;
+    break;
+  case 3:
+    mode = cavc::PlineCombineMode::XOR;
+    break;
+  default:
+    *result_out = nullptr;
+    return;
+  }
+
+  auto cppA = a->toCpp();
+  auto cppB = b->toCpp();
+  auto cppResult = cavc::combineCompoundPolylines(cppA, cppB, mode);
+
+  auto *result = new cavc_compound_pline{};
+  for (auto &loop : cppResult.outerLoops) {
+    result->outerLoops.push_back(std::make_unique<cavc_pline>(std::move(loop)));
+  }
+  for (auto &loop : cppResult.holeLoops) {
+    result->holeLoops.push_back(std::make_unique<cavc_pline>(std::move(loop)));
+  }
+  *result_out = result;
   CAVC_END_TRY_CATCH
 }
